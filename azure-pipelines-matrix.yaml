@@ -45,7 +45,8 @@ stages:
           script: 'printenv'
       maxParallel: 6
     pool:
-      vmImage: $(imageName)
+      name: debian-corgito-pool
+      #vmImage: $(imageName)
     steps:
     - checkout: none
     - script: |
@@ -67,7 +68,8 @@ stages:
           location: 'west-us'
       maxParallel: 1
     pool:
-      vmImage: 'ubuntu-22.04'
+      name: debian-corgito-pool
+      #vmImage: 'ubuntu-22.04'
     steps:
     - checkout: none
     - script: |
