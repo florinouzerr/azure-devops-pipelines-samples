@@ -1,55 +1,74 @@
-trigger:
-- main
+name: Azure DevOps Pipelines - Matrix Strategy
 
-pool:
-  vmImage: ubuntu-latest
+trigger: none
 
-variables:
-  repository: "myimage"
-  dockerfilePath: "$(Build.SourcesDirectory)/Dockerfile"
-  tag: $(Build.BuildId)
+stages:
+- stage: Build_Stage
+  jobs:
 
-steps:
-  - task: Cache@2
-    displayName: Cache task
-    inputs:
-      key: 'docker | "$(Agent.OS)" | cache3'
-      path: $(Pipeline.Workspace)/docker
-      cacheHitVar: CACHE_RESTORED #Variable to set to 'true' when the cache is restored
+  - job: Build
+    strategy:
+      matrix:
+        Python35:
+          PYTHON_VERSION: '3.5'
+        Python36:
+          PYTHON_VERSION: '3.6'
+        Python37:
+          PYTHON_VERSION: '3.7'
+      maxParallel: 3
+    steps:
+    - checkout: none
+    - script: echo $(PYTHON_VERSION)
 
-  - script: |
-      ls $(Pipeline.Workspace)/docker/
-      docker load -i $(Pipeline.Workspace)/docker/cache.tar
-      # docker load -i $(Pipeline.Workspace)/docker/cache-dotnet-sdk.tar
-    displayName: Docker restore
-    condition: and(not(canceled()), eq(variables.CACHE_RESTORED, 'true'))
+- stage: Test_Stage
+  jobs:
+  - job: Test
+    strategy:
+      matrix:
+        WindowsServer2022:
+          imageName: 'windows-2022'
+          script: 'set'
+        WindowsServer2019:
+          imageName: 'windows-2019'
+          script: 'set'
+        ubuntu-22-04:
+          imageName: 'ubuntu-22.04'
+          script: 'printenv'
+        ubuntu-20-04:
+          imageName: 'ubuntu-20.04'
+          script: 'printenv'
+        macos-12-monterey:
+          imageName: 'macOS-12'
+          script: 'printenv'
+        macos-11-bigsur:
+          imageName: 'macOS-11'
+          script: 'printenv'
+      maxParallel: 6
+    pool:
+      vmImage: $(imageName)
+    steps:
+    - checkout: none
+    - script: |
+        echo $(imageName)
+        $(script)
 
-  # - script: |
-  #     date
-  #     docker pull mcr.microsoft.com/dotnet/aspnet:8.0
-  #     docker pull mcr.microsoft.com/dotnet/sdk:8.0
-  #     date
-  #   displayName: Docker pull
-
-  - task: Docker@2
-    displayName: "Build Docker"
-    inputs:
-      command: "build"
-      repository: $(repository)
-      dockerfile: $(dockerfilePath)
-      tags: |
-        $(tag)
-
-  - script: |
-      mkdir -p $(Pipeline.Workspace)/docker
-      docker save -o $(Pipeline.Workspace)/docker/cache.tar $(repository):$(tag)
-      # docker pull mcr.microsoft.com/dotnet/sdk:8.0 || true
-      # docker save -o $(Pipeline.Workspace)/docker/cache-dotnet-sdk.tar "mcr.microsoft.com/dotnet/sdk:8.0"
-    displayName: Docker save
-    condition: and(not(canceled()), not(failed()), ne(variables.CACHE_RESTORED, 'true'))
-
-  # - script: |
-  #     mkdir -p $(Pipeline.Workspace)/docker
-  #     docker save -o $(Pipeline.Workspace)/docker/cache.tar $(repository):$(tag)
-  #   displayName: Docker save
-  #   condition: and(not(canceled()), not(failed()), ne(variables.CACHE_RESTORED, 'true'))
+- stage: Prod_Stage
+  jobs:
+  - job: Prod
+    strategy:
+      matrix:
+        Deploy_Prod_EastEurope:
+          location: 'East-europe'
+        Deploy_Prod_WestEurope:
+          location: 'west-europe'
+        Deploy_Prod_EastUS:
+          location: 'east-us'
+        Deploy_Prod_WestUS:
+          location: 'west-us'
+      maxParallel: 1
+    pool:
+      vmImage: 'ubuntu-22.04'
+    steps:
+    - checkout: none
+    - script: |
+        echo 'Started deploying app to region $(location)...'
